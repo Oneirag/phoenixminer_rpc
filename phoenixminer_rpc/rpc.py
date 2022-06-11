@@ -2,14 +2,12 @@
 import socket
 import json
 import time
-# from aemet import Aemet
+from phoenixminer_rpc.aemet import Aemet
 import datetime
-from phoenixminer_rpc import config, logger, START_MINER_DELAY, is_debugging
+from phoenixminer_rpc import config, logger, START_MINER_DELAY, is_debugging, MAX_TEMP
 from phoenixminer_rpc.reboot import reboot
 
 #from endesa import punta_convenio
-
-MAX_TEMP = 30
 
 # time for reboot + claymore to get share and start hashing
 loop_seconds = 60 * 20  # 20 minutes
@@ -180,7 +178,7 @@ if __name__ == '__main__':
     host = "127.0.0.1"
     rig_status = RigStatus(host, port=config("CDM_PORT"),
                            password=config("CDM_PASS"))
-    #pred = Aemet()
+    pred = Aemet()
     logger.info("Starting rig management")
 
     if not is_debugging():
@@ -205,17 +203,16 @@ if __name__ == '__main__':
             if not rig_status.check_detailed_status():
                 logger.error("Frozen cards found, rebooting")
                 reboot()
-        # temp = pred.get_hourly_data(tipo="temperatura")
-        # current_temp = float(temp[datetime.datetime.now().hour])
-        # status = current_temp < MAX_TEMP
-        # log.info(f"Current temperature: {current_temp} so setting cards to {status}")
+        current_temp = pred.get_pred_hour(tipo="temperatura")
+        status = current_temp < MAX_TEMP
+        logger.info(f"Current temperature: {current_temp} so setting cards to {status}")
         # # If punta_convenio then switch all cards off
         # is_peak = punta_convenio()
         # status = status and not is_peak
         # log.info(f"Peak time is: {is_peak} so setting cards to {status}")
-        # for card in range(n_cards):
-        #     log.info(f"Setting card {card} to status {status}")
-        #     log.info(rig_status.set_card_status(card, status))
+        for card in range(n_cards):
+            logger.info(f"Setting card {card} to status {status}")
+            logger.info(rig_status.set_card_status(card, status))
         next_loop = datetime.datetime.now() + datetime.timedelta(seconds=loop_seconds)
         logger.info(f"loop sleep. Next loop at {next_loop}")
         time.sleep(loop_seconds)

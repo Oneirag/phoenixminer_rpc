@@ -6,3 +6,4 @@ logger = cfg.logger
 config = cfg.config
 wallet = hex(config("WALLET"))      # This must be translated back to hex
 START_MINER_DELAY = 15 * 60         # wait 15 mins for miner to start before checks
+MAX_TEMP = config("MAX_TEMP", 30)

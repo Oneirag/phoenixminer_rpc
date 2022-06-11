@@ -2,8 +2,9 @@
 import time
 
 import requests
-from phoenixminer_rpc import logger, config, wallet, START_MINER_DELAY
+from phoenixminer_rpc import logger, config, wallet, START_MINER_DELAY, MAX_TEMP
 from phoenixminer_rpc.reboot import reboot
+from phoenixminer_rpc.aemet import Aemet
 
 nanopool_url = 'https://api.nanopool.org/v1/eth/hashrate/{WALLET}/{WORKER}'.format(
     WALLET=wallet, WORKER=config("WORKER")
@@ -15,6 +16,7 @@ headers = {
 
 logger.info("Starting nanopool speed check process")
 time.sleep(START_MINER_DELAY)  # Wait 15 min to start checking
+aemet = Aemet()
 while True:
     json = dict()
     logger.info("Checking connection to nanopool")
@@ -32,8 +34,10 @@ while True:
     hashrate = json.get('data', 0)
 
     if hashrate == 0:
-        # send_email(json['data'])
-        logger.info("Current hashrate is 0, rebooting")
-        reboot()
+        if aemet.get_pred_hour() > MAX_TEMP or aemet.get_pred_hour(h_offset=-1) > MAX_TEMP:
+            logger.info("Current hashrate is 0, but forecast temp to high")
+        else:
+            logger.info("Current hashrate is 0, rebooting")
+            reboot()
 
     time.sleep(1 * 60)  # Wait 1 min
