@@ -59,7 +59,7 @@ class RigStatus(object):
         rig_speed_khs, submitted_hashes, rejected_hashes = (int(v) for v in status['result'][2].split(";"))
         rig_speed = rig_speed_khs / 1e3     # in MH/s
         # Cards speed in MH/s
-        self.cards_speed = tuple(float(v)/1e3 for v in status['result'][3].split(";"))
+        self.cards_speed = tuple(0 if v == "off" else float(v)/1e3 for v in status['result'][3].split(";"))
         if submitted_hashes != self.submitted_shares:
             self.last_speed_change = datetime.datetime.now()
             self.submitted_shares = submitted_hashes
