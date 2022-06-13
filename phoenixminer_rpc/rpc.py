@@ -190,19 +190,6 @@ if __name__ == '__main__':
         status = rig_status.get_status()
         logger.info(status)
         min_without_shares = 15
-        if not rig_status.check_speed(min_without_shares):
-            # Restart
-            logger.error(f"Rebooting due to minutes without shares {min_without_shares=}")
-            reboot()
-            # Restart miner
-            rig_status.restart_miner()
-            # rig_status.get_command("miner_reboot")  # Calls reboot.sh
-        n_cards = len(rig_status.cards_speed)
-        if any(speed == 0 for speed in rig_status.cards_speed):
-            logger.info(f"Cards with 0 speed found: {rig_status.cards_speed}")
-            if not rig_status.check_detailed_status():
-                logger.error("Frozen cards found, rebooting")
-                reboot()
         current_temp = pred.get_pred_hour(tipo="temperatura")
         status = current_temp < MAX_TEMP
         logger.info(f"Current temperature: {current_temp} so setting cards to {status}")
@@ -213,6 +200,20 @@ if __name__ == '__main__':
         for card in range(n_cards):
             logger.info(f"Setting card {card} to status {status}")
             logger.info(rig_status.set_card_status(card, status))
+        if status:  # Only check for the rest if temperature is lower than MAX
+            if not rig_status.check_speed(min_without_shares):
+                # Restart
+                logger.error(f"Rebooting due to minutes without shares {min_without_shares=}")
+                reboot()
+                # Restart miner
+                rig_status.restart_miner()
+                # rig_status.get_command("miner_reboot")  # Calls reboot.sh
+            n_cards = len(rig_status.cards_speed)
+            if any(speed == 0 for speed in rig_status.cards_speed):
+                logger.info(f"Cards with 0 speed found: {rig_status.cards_speed}")
+                if not rig_status.check_detailed_status():
+                    logger.error("Frozen cards found, rebooting")
+                    reboot()
         next_loop = datetime.datetime.now() + datetime.timedelta(seconds=loop_seconds)
         logger.info(f"loop sleep. Next loop at {next_loop}")
         time.sleep(loop_seconds)
