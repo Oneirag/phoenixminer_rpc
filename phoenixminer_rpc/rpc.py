@@ -188,6 +188,7 @@ if __name__ == '__main__':
     while True:
         rig_status.check_ping()
         status = rig_status.get_status()
+        n_cards = len(status['result'][2].split(";"))
         logger.info(status)
         min_without_shares = 15
         current_temp = pred.get_pred_hour(tipo="temperatura")
