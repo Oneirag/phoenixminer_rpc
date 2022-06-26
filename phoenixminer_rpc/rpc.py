@@ -69,7 +69,7 @@ class RigStatus(object):
         return self.__query(self.get_command(method="miner_getstatdetail"))
 
     def check_speed(self, minutes=15):
-        """Returns true if the time between submited shares is lower
+        """Returns true if the time between submitted shares is lower
         than value of informed minutes"""
         now = datetime.datetime.now()
         elapsed_minutes = (now - self.last_speed_change).seconds / 60
@@ -187,9 +187,10 @@ if __name__ == '__main__':
     # main loop
     while True:
         rig_status.check_ping()
-        status = rig_status.get_status()
-        n_cards = len(status['result'][2].split(";"))
-        logger.info(status)
+        card_status = rig_status.get_status()
+        n_cards = len(card_status['result'][2].split(";"))
+        logger.info(card_status)
+        cards_on = tuple("off" != s for s in card_status['result'][3].split(";"))
         min_without_shares = 15
         current_temp = pred.get_pred_hour(tipo="temperatura")
         status = current_temp < MAX_TEMP
@@ -198,9 +199,10 @@ if __name__ == '__main__':
         # is_peak = punta_convenio()
         # status = status and not is_peak
         # log.info(f"Peak time is: {is_peak} so setting cards to {status}")
-        for card in range(n_cards):
+        for card, card_on in zip(range(n_cards), cards_on):
             logger.info(f"Setting card {card} to status {status}")
-            logger.info(rig_status.set_card_status(card, status))
+            if status != card_on:  # Only send message when status is different to target
+                logger.info(rig_status.set_card_status(card, status))
         if status:  # Only check for the rest if temperature is lower than MAX
             if not rig_status.check_speed(min_without_shares):
                 # Restart
@@ -208,8 +210,8 @@ if __name__ == '__main__':
                 reboot()
                 # Restart miner
                 rig_status.restart_miner()
-                # rig_status.get_command("miner_reboot")  # Calls reboot.sh
             n_cards = len(rig_status.cards_speed)
+            time.sleep(5)   # wait 5 secs for the rig to stabilize
             if any(speed == 0 for speed in rig_status.cards_speed):
                 logger.info(f"Cards with 0 speed found: {rig_status.cards_speed}")
                 if not rig_status.check_detailed_status():
