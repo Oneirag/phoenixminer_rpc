@@ -7,12 +7,13 @@ import datetime
 from phoenixminer_rpc import config, logger, START_MINER_DELAY, is_debugging, MAX_TEMP
 from phoenixminer_rpc.reboot import reboot
 
-#from endesa import punta_convenio
+from phoenixminer_rpc.power_prices_calendar import peak_price
 
 # time for reboot + claymore to get share and start hashing
 loop_seconds = 60 * 20  # 20 minutes
 loop_seconds = 60 * 10  # 10 minutes
 loop_seconds = 10  # 10 seconds
+loop_seconds = 60  # 1 minute
 
 
 class RigStatus(object):
@@ -191,14 +192,15 @@ if __name__ == '__main__':
         n_cards = len(card_status['result'][2].split(";"))
         logger.info(card_status)
         cards_on = tuple("off" != s for s in card_status['result'][3].split(";"))
+        is_peak = peak_price()
         min_without_shares = 15
         current_temp = pred.get_pred_hour(tipo="temperatura")
         status = current_temp < MAX_TEMP
         logger.info(f"Current temperature: {current_temp} so setting cards to {status}")
-        # # If punta_convenio then switch all cards off
-        # is_peak = punta_convenio()
-        # status = status and not is_peak
-        # log.info(f"Peak time is: {is_peak} so setting cards to {status}")
+        # If punta_convenio then switch all cards off
+        is_peak = peak_price()
+        status = status and not is_peak
+        logger.info(f"Peak time is: {is_peak} so setting cards to {status}")
         for card, card_on in zip(range(n_cards), cards_on):
             logger.info(f"Setting card {card} to status {status}")
             if status != card_on:  # Only send message when status is different to target

@@ -1,13 +1,19 @@
 #!/usr/bin/env python
 import time
 
+import pandas as pd
 import requests
+from phoenixminer_rpc import is_debugging
 from phoenixminer_rpc import logger, config, wallet, START_MINER_DELAY, MAX_TEMP
 from phoenixminer_rpc.reboot import reboot
 from phoenixminer_rpc.aemet import Aemet
+from phoenixminer_rpc.power_prices_calendar import peak_price
 
-nanopool_url = 'https://api.nanopool.org/v1/eth/hashrate/{WALLET}/{WORKER}'.format(
-    WALLET=wallet, WORKER=config("WORKER")
+coin = "eth"
+coin = "etc"
+
+nanopool_url = 'https://api.nanopool.org/v1/{coin}/hashrate/{WALLET}/{WORKER}'.format(
+    WALLET=wallet, WORKER=config("WORKER"), coin=config("COIN", coin)
 )
 
 headers = {
@@ -15,7 +21,7 @@ headers = {
 }
 
 logger.info("Starting nanopool speed check process")
-time.sleep(START_MINER_DELAY)  # Wait 15 min to start checking
+time.sleep(START_MINER_DELAY if not is_debugging() else 0)  # Wait 15 min to start checking
 aemet = Aemet()
 while True:
     json = dict()
@@ -33,7 +39,11 @@ while True:
     logger.info(f"Data read from nanopool: {json}")
     hashrate = json.get('data', 0)
 
-    if hashrate == 0:
+    # it should have been peak at least 20 mins ago, as pool data refreshes
+    # each 10 mins
+    peak_time = pd.Timestamp.now() - pd.offsets.Minute(20)
+
+    if hashrate == 0 and not peak_price(peak_time) and not peak_time():
         if aemet.get_pred_hour() > MAX_TEMP or aemet.get_pred_hour(h_offset=-1) > MAX_TEMP:
             logger.info("Current hashrate is 0, but forecast temp to high")
         else:
