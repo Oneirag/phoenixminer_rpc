@@ -98,6 +98,11 @@ class RigStatus(object):
 
     def check_ping(self):
         """If ping is invalid, reboot"""
+        try:
+            self.__connect()
+        except ConnectionRefusedError:
+            logger.error("Could not connect to miner, rebooting")
+            reboot()
         return  # Phoenixminer seems not to accept pings
         if not rig_status.ping():
             logger.error("Ping method failed, rebooting")
@@ -187,38 +192,39 @@ if __name__ == '__main__':
 
     # main loop
     while True:
-        rig_status.check_ping()
-        card_status = rig_status.get_status()
-        n_cards = len(card_status['result'][2].split(";"))
-        logger.info(card_status)
-        cards_on = tuple("off" != s for s in card_status['result'][3].split(";"))
         is_peak = peak_price()
-        min_without_shares = 15
-        current_temp = pred.get_pred_hour(tipo="temperatura")
-        status = current_temp < MAX_TEMP
-        logger.info(f"Current temperature: {current_temp} so setting cards to {status}")
-        # If punta_convenio then switch all cards off
-        is_peak = peak_price()
-        status = status and not is_peak
-        logger.info(f"Peak time is: {is_peak} so setting cards to {status}")
-        for card, card_on in zip(range(n_cards), cards_on):
-            logger.info(f"Setting card {card} to status {status}")
-            if status != card_on:  # Only send message when status is different to target
-                logger.info(rig_status.set_card_status(card, status))
-        if status:  # Only check for the rest if temperature is lower than MAX
-            if not rig_status.check_speed(min_without_shares):
-                # Restart
-                logger.error(f"Rebooting due to minutes without shares {min_without_shares=}")
-                reboot()
-                # Restart miner
-                rig_status.restart_miner()
-            n_cards = len(rig_status.cards_speed)
-            time.sleep(5)   # wait 5 secs for the rig to stabilize
-            if any(speed == 0 for speed in rig_status.cards_speed):
-                logger.info(f"Cards with 0 speed found: {rig_status.cards_speed}")
-                if not rig_status.check_detailed_status():
-                    logger.error("Frozen cards found, rebooting")
+        if not is_peak:     # Only check miner status in not peak hours
+            rig_status.check_ping()
+            card_status = rig_status.get_status()
+            n_cards = len(card_status['result'][2].split(";"))
+            logger.info(card_status)
+            cards_on = tuple("off" != s for s in card_status['result'][3].split(";"))
+            is_peak = peak_price()
+            min_without_shares = 15
+            current_temp = pred.get_pred_hour(tipo="temperatura")
+            status = current_temp < MAX_TEMP
+            logger.info(f"Current temperature: {current_temp} so setting cards to {status}")
+            # If punta_convenio then switch all cards off
+            status = status and not is_peak
+            logger.info(f"Peak time is: {is_peak} so setting cards to {status}")
+            for card, card_on in zip(range(n_cards), cards_on):
+                logger.info(f"Setting card {card} to status {status}")
+                if status != card_on:  # Only send message when status is different to target
+                    logger.info(rig_status.set_card_status(card, status))
+            if status:  # Only check for the rest if temperature is lower than MAX
+                if not rig_status.check_speed(min_without_shares):
+                    # Restart
+                    logger.error(f"Rebooting due to minutes without shares {min_without_shares=}")
                     reboot()
+                    # Restart miner
+                    rig_status.restart_miner()
+                n_cards = len(rig_status.cards_speed)
+                time.sleep(5)   # wait 5 secs for the rig to stabilize
+                if any(speed == 0 for speed in rig_status.cards_speed):
+                    logger.info(f"Cards with 0 speed found: {rig_status.cards_speed}")
+                    if not rig_status.check_detailed_status():
+                        logger.error("Frozen cards found, rebooting")
+                        reboot()
         next_loop = datetime.datetime.now() + datetime.timedelta(seconds=loop_seconds)
         logger.info(f"loop sleep. Next loop at {next_loop}")
         time.sleep(loop_seconds)
